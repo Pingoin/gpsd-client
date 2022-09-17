@@ -11,7 +11,7 @@ var fix []string = []string{"unkown", "no fix", "2D", "3D"}
 
 type GPSD struct {
 	Alt         float64   `json:"alt"`
-	SatsVisible []GSVInfo `json:"satsGpsVisible"`
+	SatsVisible []GSVInfo `json:"satsVisible"`
 	Fix         string    `json:"fix"`
 	Hdop        float64   `json:"hdop"`
 	Pdop        float64   `json:"pdop"`
