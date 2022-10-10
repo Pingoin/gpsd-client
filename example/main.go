@@ -11,6 +11,8 @@ import (
 func main() {
 	gps := gnss.NewGPSD("localhost:2947", 0, 0)
 
+	// wait for reply
+
 	go gps.Start()
 
 	for {

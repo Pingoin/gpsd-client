@@ -1,70 +1,101 @@
 package gnss
 
 import (
+	"bufio"
+	"encoding/json"
 	"fmt"
-	"time"
-
-	deamon "github.com/stratoberry/go-gpsd"
+	"net"
 )
 
 var fix []string = []string{"unkown", "no fix", "2D", "3D"}
-
-type GPSD struct {
-	Alt         float64   `json:"alt"`
-	SatsVisible []GSVInfo `json:"satsVisible"`
-	Fix         string    `json:"fix"`
-	Hdop        float64   `json:"hdop"`
-	Pdop        float64   `json:"pdop"`
-	Vdop        float64   `json:"vdop"`
-	Longitude   float64   `json:"longitude"`
-	Latitude    float64   `json:"latitude"`
-	Timestamp   time.Time `json:"timestamp"`
-}
-
-type GSVInfo struct {
-	SVPRNNumber float64 `json:"prn"`       // SV PRN number, pseudo-random noise or gold code
-	Elevation   float64 `json:"elevation"` // Elevation in degrees, 90 maximum
-	Azimuth     float64 `json:"azimuth"`   // Azimuth, degrees from true north, 000 to 359
-	SNR         float64 `json:"snr"`       // SNR, 00-99 dB (null when not tracking)
-	Used        bool    `json:"used"`
-	Type        string  `json:"type"`
-}
+var satSystem []string = []string{"GPS", "unknown", "Galileo", "Beidou", "unknown", "QZSS", "GLONASS"}
 
 func NewGPSD(server string, startLongitude, startLatitude float64) *GPSD {
-	gpsd := GPSD{}
+	gpsd := GPSD{
+		server: server,
+	}
 	return &gpsd
 }
 
-func (gpsd *GPSD) Start() {
-	var gps *deamon.Session
+func (gpsd *GPSD) Start() error {
 	var err error
 
-	if gps, err = deamon.Dial(deamon.DefaultAddress); err != nil {
-		panic(fmt.Sprintf("Failed to connect to GPSD: %s", err))
+	// connect to server
+	gpsd.gpsd, err = net.Dial("tcp", "127.0.0.1:2947")
+	if err != nil {
+		return err
 	}
+	fmt.Fprintf(gpsd.gpsd, "?WATCH={\"enable\":true,\"json\":true}")
+	go gpsd.loop()
 
-	gps.AddFilter("TPV", gpsd.tpvFilter)
-	gps.AddFilter("SKY", gpsd.skyfilter)
-	done := gps.Watch()
-	<-done
+	return nil
 }
 
-func (gpsd *GPSD) tpvFilter(r interface{}) {
-	tpv := r.(*deamon.TPVReport)
+func (gpsd *GPSD) loop() {
+	reader := bufio.NewReader(gpsd.gpsd)
+	for {
+		buffer, _ := reader.ReadBytes('\n')
+		msg := &basemsg{}
+		json.Unmarshal(buffer, msg)
 
-	mode := tpv.Mode
-	gpsd.Fix = fix[mode]
+		switch msg.Class {
+		case "TPV":
+			gpsd.tpvFilter(buffer)
+		case "SKY":
+			gpsd.skyfilter(buffer)
+		case "PPS":
+			gpsd.ppsFilter(buffer)
+		default:
+			fmt.Println(msg.Class)
+		}
+	}
+}
+
+func (gpsd *GPSD) tpvFilter(data []byte) {
+	tpv := TPVReport{}
+	err := json.Unmarshal(data, &tpv)
+	if err != nil {
+		return
+	}
+	gpsd.Fix = fix[tpv.Mode]
 	gpsd.Alt = tpv.Alt
 	gpsd.Timestamp = tpv.Time
 	gpsd.Latitude = tpv.Lat
 	gpsd.Longitude = tpv.Lon
+	gpsd.Leapseconds = tpv.Leapseconds
+	gpsd.TPVReport = tpv
 }
 
-func (gpsd *GPSD) skyfilter(r interface{}) {
-	sky := r.(*deamon.SKYReport)
-	gpsd.Hdop = sky.Hdop
-	gpsd.Pdop = sky.Pdop
-	gpsd.Vdop = sky.Vdop
+func (gpsd *GPSD) ppsFilter(data []byte) {
+	pps := PPSReport{}
+	err := json.Unmarshal(data, &pps)
+	if err != nil {
+		return
+	}
+	gpsd.TimeData.Clock_Nsec = pps.Clock_Nsec
+	gpsd.TimeData.Clock_Sec = pps.Clock_Sec
+	gpsd.TimeData.Precision = pps.Precision
+	gpsd.TimeData.Real_Nsec = pps.Real_Nsec
+	gpsd.TimeData.Real_Sec = pps.Real_Sec
+	gpsd.TimeData.Qerr = pps.Qerr
+	gpsd.TimeData.Shm = pps.Shm
+}
+
+func (gpsd *GPSD) skyfilter(data []byte) {
+	sky := SKYReport{}
+	err := json.Unmarshal(data, &sky)
+	if err != nil {
+		return
+	}
+
+	gpsd.DilutionOfPrecision.Xdop = sky.Xdop
+	gpsd.DilutionOfPrecision.Ydop = sky.Ydop
+	gpsd.DilutionOfPrecision.Vdop = sky.Vdop
+	gpsd.DilutionOfPrecision.Tdop = sky.Tdop
+	gpsd.DilutionOfPrecision.Hdop = sky.Hdop
+	gpsd.DilutionOfPrecision.Pdop = sky.Pdop
+	gpsd.DilutionOfPrecision.Gdop = sky.Gdop
+
 	sats := sky.Satellites
 	gpsd.SatsVisible = make([]GSVInfo, 0)
 
@@ -75,14 +106,7 @@ func (gpsd *GPSD) skyfilter(r interface{}) {
 			Azimuth:     sat.Az,
 			SNR:         sat.Ss,
 			Used:        sat.Used,
-		}
-		if (newSat.SVPRNNumber >= 1) && (newSat.SVPRNNumber <= 63) {
-			newSat.Type = "GPS"
-
-		} else if (newSat.SVPRNNumber >= 64) && (newSat.SVPRNNumber <= 96) {
-			newSat.Type = "Glonass"
-		} else {
-			newSat.Type = "GALILEO"
+			Type:        satSystem[sat.Gnssid],
 		}
 		gpsd.SatsVisible = append(gpsd.SatsVisible, newSat)
 	}
