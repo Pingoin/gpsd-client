@@ -22,9 +22,7 @@ type basemsg struct {
 const DefaultAddress = "localhost:2947"
 
 type GPSD struct {
-	Alt                 float64   `json:"alt"`
 	SatsVisible         []GSVInfo `json:"satsVisible"`
-	Fix                 string    `json:"fix"`
 	DilutionOfPrecision struct {
 		Xdop float64 `json:"xdop"`
 		Ydop float64 `json:"ydop"`
@@ -34,14 +32,17 @@ type GPSD struct {
 		Pdop float64 `json:"pdop"`
 		Gdop float64 `json:"gdop"`
 	} `json:"dilutionOfPrecision"`
-	Longitude   float64   `json:"longitude"`
-	Latitude    float64   `json:"latitude"`
-	Timestamp   time.Time `json:"timestamp"`
-	gpsd        net.Conn
-	server      string
-	Leapseconds int      `json:"leapseconds"`
-	TimeData    TimeData `json:"timeData"`
-	TPVReport   `json:"tpvReport"`
+	Position struct {
+		Altitude         float64 `json:"altitude"`
+		Longitude        float64 `json:"longitude"`
+		Latitude         float64 `json:"latitude"`
+		Fix              string  `json:"fix"`
+		MagneticVariance float64 `json:"magneticVariance"`
+	} `json:"position"`
+	TimeData TimeData `json:"timeData"`
+	gpsd     net.Conn
+	server   string
+	//TPVReport `json:"tpvReport"`
 }
 
 type GSVInfo struct {
@@ -143,11 +144,13 @@ type PPSReport struct {
 }
 
 type TimeData struct {
-	Real_Sec   float64 `json:"real_sec"`   //	seconds from the PPS source
-	Real_Nsec  float64 `json:"real_nsec"`  //	nanoseconds from the PPS source
-	Clock_Sec  float64 `json:"clock_sec"`  //	seconds from the system clock
-	Clock_Nsec float64 `json:"clock_nsec"` //	nanoseconds from the system clock
-	Precision  float64 `json:"precision"`  //	NTP style estimate of PPS precision
-	Shm        string  `json:"shm"`        //	shm key of this PPS
-	Qerr       float64 `json:"qErr"`       //	Quantization error of the PPS, in picoseconds. Sometimes called the "sawtooth" error.
+	Real_Sec    float64   `json:"real_sec"`   //	seconds from the PPS source
+	Real_Nsec   float64   `json:"real_nsec"`  //	nanoseconds from the PPS source
+	Clock_Sec   float64   `json:"clock_sec"`  //	seconds from the system clock
+	Clock_Nsec  float64   `json:"clock_nsec"` //	nanoseconds from the system clock
+	Precision   float64   `json:"precision"`  //	NTP style estimate of PPS precision
+	Shm         string    `json:"shm"`        //	shm key of this PPS
+	Qerr        float64   `json:"qErr"`       //	Quantization error of the PPS, in picoseconds. Sometimes called the "sawtooth" error.
+	Timestamp   time.Time `json:"timestamp"`
+	Leapseconds int       `json:"leapseconds"`
 }

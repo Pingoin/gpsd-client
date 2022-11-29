@@ -21,7 +21,7 @@ func (gpsd *GPSD) Start() error {
 	var err error
 
 	// connect to server
-	gpsd.gpsd, err = net.Dial("tcp", "127.0.0.1:2947")
+	gpsd.gpsd, err = net.Dial("tcp", gpsd.server)
 	if err != nil {
 		return err
 	}
@@ -46,7 +46,7 @@ func (gpsd *GPSD) loop() {
 		case "PPS":
 			gpsd.ppsFilter(buffer)
 		default:
-			fmt.Println(msg.Class)
+			fmt.Println(string(buffer))
 		}
 	}
 }
@@ -57,13 +57,14 @@ func (gpsd *GPSD) tpvFilter(data []byte) {
 	if err != nil {
 		return
 	}
-	gpsd.Fix = fix[tpv.Mode]
-	gpsd.Alt = tpv.Alt
-	gpsd.Timestamp = tpv.Time
-	gpsd.Latitude = tpv.Lat
-	gpsd.Longitude = tpv.Lon
-	gpsd.Leapseconds = tpv.Leapseconds
-	gpsd.TPVReport = tpv
+	gpsd.Position.Fix = fix[tpv.Mode]
+	gpsd.Position.Altitude = tpv.Alt
+	gpsd.TimeData.Timestamp = tpv.Time
+	gpsd.Position.Latitude = tpv.Lat
+	gpsd.Position.Longitude = tpv.Lon
+	gpsd.Position.MagneticVariance = tpv.Magvar
+	gpsd.TimeData.Leapseconds = tpv.Leapseconds
+	//gpsd.TPVReport = tpv
 }
 
 func (gpsd *GPSD) ppsFilter(data []byte) {
