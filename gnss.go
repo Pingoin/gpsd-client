@@ -3,7 +3,6 @@ package gnss
 import (
 	"bufio"
 	"encoding/json"
-	"fmt"
 	"net"
 )
 
@@ -25,7 +24,7 @@ func (gpsd *GPSD) Start() error {
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(gpsd.gpsd, "?WATCH={\"enable\":true,\"json\":true}")
+	//fmt.Fprintf(gpsd.gpsd, "?WATCH={\"enable\":true,\"json\":true}")
 	go gpsd.loop()
 
 	return nil
@@ -46,7 +45,7 @@ func (gpsd *GPSD) loop() {
 		case "PPS":
 			gpsd.ppsFilter(buffer)
 		default:
-			fmt.Println(string(buffer))
+			//fmt.Println(string(buffer))
 		}
 	}
 }
