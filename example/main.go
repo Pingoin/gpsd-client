@@ -9,10 +9,10 @@ import (
 )
 
 func main() {
-	gps := gnss.NewGPSD("localhost:2947", 0, 0)
+	gps := gnss.NewGPSD(gnss.DefaultAddress, 0, 0)
+	gps.SetDebug(true)
 
 	// wait for reply
-
 	go gps.Start()
 
 	for {

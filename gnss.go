@@ -3,6 +3,7 @@ package gnss
 import (
 	"bufio"
 	"encoding/json"
+	"fmt"
 	"net"
 )
 
@@ -24,7 +25,7 @@ func (gpsd *GPSD) Start() error {
 	if err != nil {
 		return err
 	}
-	//fmt.Fprintf(gpsd.gpsd, "?WATCH={\"enable\":true,\"json\":true}")
+	fmt.Fprintf(gpsd.gpsd, "?WATCH={\"enable\":true,\"json\":true}")
 	go gpsd.loop()
 
 	return nil
@@ -45,9 +46,15 @@ func (gpsd *GPSD) loop() {
 		case "PPS":
 			gpsd.ppsFilter(buffer)
 		default:
-			//fmt.Println(string(buffer))
+			if gpsd.debug {
+				fmt.Println(string(buffer))
+			}
 		}
 	}
+}
+
+func (gpsd *GPSD) SetDebug(debug bool) {
+	gpsd.debug = debug
 }
 
 func (gpsd *GPSD) tpvFilter(data []byte) {
@@ -97,16 +104,20 @@ func (gpsd *GPSD) skyfilter(data []byte) {
 	gpsd.DilutionOfPrecision.Gdop = sky.Gdop
 
 	sats := sky.Satellites
-	gpsd.SatsVisible = make([]GSVInfo, 0)
+	gpsd.SatsVisible = make([]SatInfo, 0)
 
 	for _, sat := range sats {
-		newSat := GSVInfo{
-			SVPRNNumber: sat.PRN,
-			Elevation:   sat.El,
-			Azimuth:     sat.Az,
-			SNR:         sat.Ss,
-			Used:        sat.Used,
-			Type:        satSystem[sat.Gnssid],
+		newSat := SatInfo{
+			PRNNumber:        sat.PRN,
+			Elevation:        sat.El,
+			Azimuth:          sat.Az,
+			SignalNoiseRatio: sat.Ss,
+			Used:             sat.Used,
+			Type:             satSystem[sat.Gnssid],
+			Svid:             sat.Svid,
+			Sigid:            sat.Sigid,
+			Freqid:           sat.Freqid,
+			Health:           sat.Health,
 		}
 		gpsd.SatsVisible = append(gpsd.SatsVisible, newSat)
 	}
